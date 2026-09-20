@@ -148,9 +148,9 @@ LR2_Enigma/
 ├── experiments/run_experiments.py Усі обчислювальні експерименти та рисунки
 ├── tools/build_ngrams.py          Побудова мовної моделі з корпусу
 ├── data/                          Модель мови + текст для експериментів
-├── tools/build_report.py          Генератор PDF-звіту
+├── tools/build_report.py          Генератор звіту (PDF і DOCX з одного джерела)
 └── docs/
-    ├── ЛР_2_...РС-61мн.pdf        Звіт (36 стор., генерується скриптом)
+    ├── ЛР_2_...РС-61мн.pdf/.docx  Звіт, 20 стор. (генерується скриптом)
     ├── figures/                   Рисунки (+ pdf/ — версії без заголовків)
     └── results/                   experiments.json, summary.md
 ```
@@ -539,9 +539,11 @@ python experiments/run_experiments.py
 # 4. Перебудова мовної моделі з корпусу (потрібен інтернет; результат уже в data/)
 python tools/build_ngrams.py
 
-# 5. Складання PDF-звіту (потрібні reportlab і шрифти Times New Roman / Courier New)
-python tools/build_report.py
+# 5. Складання звіту (потрібні reportlab, python-docx і шрифти Times New Roman / Courier New)
+python tools/build_report.py                  # обидва формати
+python tools/build_report.py --format docx    # лише DOCX
 #   -> docs/ЛР_2_Гандзюк_Дмитро_РС-61мн.pdf
+#   -> docs/ЛР_2_Гандзюк_Дмитро_РС-61мн.docx
 ```
 
 Усі генератори псевдовипадкових чисел ініціалізуються фіксованими зернами,

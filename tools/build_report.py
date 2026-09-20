@@ -12,12 +12,15 @@
 
 from __future__ import annotations
 
+import argparse
 import html
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
+from PIL import Image as PILImage
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT
 from reportlab.lib.pagesizes import A4
@@ -25,23 +28,17 @@ from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import cm, mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.platypus import (
-    BaseDocTemplate,
-    Frame,
-    Image,
-    KeepTogether,
-    PageBreak,
-    PageTemplate,
-    Paragraph,
-    Spacer,
-    Table,
-    TableStyle,
-    XPreformatted,
-)
+from reportlab.platypus import BaseDocTemplate, Frame, KeepTogether, PageTemplate
+from reportlab.platypus import Image as RLImage
+from reportlab.platypus import PageBreak as RLPageBreak
+from reportlab.platypus import Paragraph, TableStyle, XPreformatted
+from reportlab.platypus import Spacer as RLSpacer
+from reportlab.platypus import Table as RLTable
 
 ROOT = Path(__file__).resolve().parents[1]
 FIG = ROOT / "docs" / "figures"
-OUT = ROOT / "docs" / "ЛР_2_Гандзюк_Дмитро_РС-61мн.pdf"
+OUT_PDF = ROOT / "docs" / "ЛР_2_Гандзюк_Дмитро_РС-61мн.pdf"
+OUT_DOCX = ROOT / "docs" / "ЛР_2_Гандзюк_Дмитро_РС-61мн.docx"
 
 # --------------------------------------------------------------------------- #
 #  Шрифти
@@ -61,49 +58,18 @@ pdfmetrics.registerFontFamily(
 )
 
 # --------------------------------------------------------------------------- #
-#  Геометрія та стилі
+#  Геометрія сторінки (спільна для обох форматів)
 # --------------------------------------------------------------------------- #
 
 PAGE_W, PAGE_H = A4
 ML, MR, MT, MB = 30 * mm, 15 * mm, 20 * mm, 20 * mm
 CONTENT_W = PAGE_W - ML - MR
 
-BODY = ParagraphStyle(
-    "body", fontName="TNR", fontSize=14, leading=21,
-    alignment=TA_JUSTIFY, firstLineIndent=1.25 * cm, spaceAfter=0,
-)
-BODY_NI = ParagraphStyle("body_ni", parent=BODY, firstLineIndent=0)
-H1 = ParagraphStyle(
-    "h1", fontName="TNR-Bold", fontSize=16, leading=24,
-    alignment=TA_CENTER, spaceBefore=14, spaceAfter=12, firstLineIndent=0,
-)
-H2 = ParagraphStyle(
-    "h2", fontName="TNR-Bold", fontSize=14, leading=21,
-    alignment=TA_CENTER, spaceBefore=12, spaceAfter=8, firstLineIndent=0,
-)
-CAPTION = ParagraphStyle(
-    "caption", fontName="TNR", fontSize=14, leading=21,
-    alignment=TA_CENTER, spaceBefore=6, spaceAfter=12, firstLineIndent=0,
-)
-TITLE_C = ParagraphStyle(
-    "title_c", fontName="TNR", fontSize=14, leading=21,
-    alignment=TA_CENTER, firstLineIndent=0,
-)
-TITLE_B = ParagraphStyle("title_b", parent=TITLE_C, fontName="TNR-Bold")
-CODE = ParagraphStyle(
-    "code", fontName="Cour", fontSize=9, leading=11,
-    alignment=TA_LEFT, firstLineIndent=0, spaceAfter=0,
-)
-TCELL = ParagraphStyle(
-    "tcell", fontName="TNR", fontSize=12, leading=15,
-    alignment=TA_LEFT, firstLineIndent=0,
-)
-TCELL_C = ParagraphStyle("tcell_c", parent=TCELL, alignment=TA_CENTER)
-TCELL_H = ParagraphStyle("tcell_h", parent=TCELL_C, fontName="TNR-Bold")
-
 
 # --------------------------------------------------------------------------- #
-#  Хелпери
+#  Зміст звіту описується послідовністю абстрактних блоків, які потім малює
+#  або reportlab (PDF), або python-docx (DOCX). Завдяки цьому текст роботи
+#  існує в єдиному екземплярі й не розходиться між форматами.
 # --------------------------------------------------------------------------- #
 
 def NUM(value: float, digits: int = 2) -> str:
@@ -111,12 +77,20 @@ def NUM(value: float, digits: int = 2) -> str:
     return ("%.*f" % (digits, value)).replace(".", ",")
 
 
-def P(text, style=BODY):
-    return Paragraph(text, style)
+def P(text, style="body"):
+    return {"k": "p", "text": text, "style": style}
 
 
 def H(text, level=1):
-    return Paragraph(text, H1 if level == 1 else H2)
+    return {"k": "h", "text": text, "level": level}
+
+
+def PageBreak():
+    return {"k": "break"}
+
+
+def Spacer(_width, height):
+    return {"k": "gap", "h": height}
 
 
 def figure(filename: str, number: str, caption: str, max_h_mm: float = 105,
@@ -124,85 +98,75 @@ def figure(filename: str, number: str, caption: str, max_h_mm: float = 105,
     """
     Рисунок із підписом під ним (за ДСТУ).
 
-    Для графіків використовується варіант без внутрішнього заголовка
-    з каталогу docs/figures/pdf — його роль виконує підпис «Рисунок N.M».
+    Для графіків береться варіант без внутрішнього заголовка з каталогу
+    docs/figures/pdf — його роль виконує підпис «Рисунок N.M – ...».
     """
     path = FIG / "pdf" / filename
     if not path.exists():
         path = FIG / filename
-    from PIL import Image as PILImage
-    with PILImage.open(path) as im:
-        iw, ih = im.size
-    w = CONTENT_W * max_w_frac
-    h = w * ih / iw
-    if h > max_h_mm * mm:
-        h = max_h_mm * mm
-        w = h * iw / ih
-    img = Image(str(path), width=w, height=h)
-    img.hAlign = "CENTER"
-    return KeepTogether([img, Paragraph("Рисунок %s – %s" % (number, caption), CAPTION)])
+    return {"k": "fig", "path": str(path), "num": number, "cap": caption,
+            "max_h_mm": max_h_mm, "max_w_frac": max_w_frac}
 
 
 def table(number: str, caption: str, rows, widths=None, align=None, header=True):
     """Таблиця з підписом над нею (за ДСТУ)."""
-    data = []
-    for r_i, row in enumerate(rows):
-        line = []
-        for c_i, cell in enumerate(row):
-            if r_i == 0 and header:
-                st = TCELL_H
-            else:
-                st = TCELL_C if (align and align[c_i] == "c") else TCELL
-            line.append(Paragraph(str(cell), st))
-        data.append(line)
-
-    t = Table(data, colWidths=widths, hAlign="CENTER", repeatRows=1 if header else 0)
-    t.setStyle(TableStyle([
-        ("GRID", (0, 0), (-1, -1), 0.6, colors.black),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("TOPPADDING", (0, 0), (-1, -1), 3),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-        ("LEFTPADDING", (0, 0), (-1, -1), 4),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
-        ("BACKGROUND", (0, 0), (-1, 0), colors.Color(0.93, 0.93, 0.93)),
-    ]))
-    cap = Paragraph("Таблиця %s – %s" % (number, caption),
-                    ParagraphStyle("tcap", parent=BODY_NI, spaceAfter=4))
-    return [cap, t, Spacer(1, 12)]
+    return [{"k": "table", "num": number, "cap": caption,
+             "rows": [[str(c) for c in row] for row in rows],
+             "widths": widths, "align": align, "header": header}]
 
 
 def listing(path: Path, max_lines: int | None = None):
     """Лістинг коду моноширинним шрифтом зі збереженням відступів."""
     text = path.read_text(encoding="utf-8").replace("\t", "    ")
-    lines = text.splitlines()
+    code = text.splitlines()
     if max_lines:
-        lines = lines[:max_lines]
-    out = []
-    chunk: list[str] = []
-    for ln in lines:
-        chunk.append(html.escape(ln) if ln.strip() else "&nbsp;")
-        if len(chunk) >= 40:                 # шматками, щоб працювали розриви сторінок
-            out.append(XPreformatted("\n".join(chunk), CODE))
-            chunk = []
-    if chunk:
-        out.append(XPreformatted("\n".join(chunk), CODE))
-    return out
+        code = code[:max_lines]
+    return [{"k": "code", "lines": code, "size": 9}]
 
 
 def console(text: str):
     """Блок виводу консолі."""
-    body = "\n".join(html.escape(l) if l.strip() else "&nbsp;"
-                     for l in text.strip("\n").splitlines())
-    return [Spacer(1, 4),
-            XPreformatted(body, ParagraphStyle("con", parent=CODE, fontSize=10, leading=12.5)),
-            Spacer(1, 10)]
+    return [{"k": "code", "lines": text.strip("\n").splitlines(), "size": 10}]
 
 
-def on_page(canvas, doc):
-    canvas.saveState()
-    canvas.setFont("TNR", 14)
-    canvas.drawCentredString(PAGE_W / 2.0, 12 * mm, str(canvas.getPageNumber()))
-    canvas.restoreState()
+# --------------------------------------------------------------------------- #
+#  Розмітка всередині абзацу: <b>…</b> і <i>…</i>
+# --------------------------------------------------------------------------- #
+
+_TAG = re.compile(r"</?([bi])>")
+
+
+def nbsp(text: str) -> str:
+    """
+    Нерозривний пробіл там, де розрив рядка виглядав би неохайно:
+    «100 %», «26 символів» тощо.
+    """
+    return re.sub(r"(\d)\s(%|мс|с\b|біт)", "\\1\u00a0\\2", text)
+
+
+def runs(text: str):
+    """Розбиває текст на фрагменти (текст, жирний, курсив) — потрібно для DOCX."""
+    text = nbsp(text)
+    out, bold, italic, pos = [], False, False, 0
+    for m in _TAG.finditer(text):
+        chunk = text[pos:m.start()]
+        if chunk:
+            out.append((html.unescape(chunk), bold, italic))
+        closing = m.group(0).startswith("</")
+        if m.group(1) == "b":
+            bold = not closing
+        else:
+            italic = not closing
+        pos = m.end()
+    tail = text[pos:]
+    if tail:
+        out.append((html.unescape(tail), bold, italic))
+    return out or [("", False, False)]
+
+
+def plain(text: str) -> str:
+    """Текст без розмітки."""
+    return html.unescape(_TAG.sub("", nbsp(text)))
 
 
 # --------------------------------------------------------------------------- #
@@ -232,31 +196,21 @@ def title_page():
         "Радіотехнічний факультет",
         "Кафедра прикладної радіоелектроніки",
     ]:
-        s.append(P(line, TITLE_C))
+        s.append(P(line, "title_c"))
     s.append(Spacer(1, 115))
-    s.append(P("Звіт", TITLE_C))
-    s.append(P("про лабораторну роботу №2 за темою", TITLE_C))
-    s.append(P("«Шифрування та розшифрування на машині «Енігма»»", TITLE_B))
-    s.append(P("з дисципліни", TITLE_C))
-    s.append(P("«Захист даних»", TITLE_C))
+    s.append(P("Звіт", "title_c"))
+    s.append(P("про лабораторну роботу №2 за темою", "title_c"))
+    s.append(P("«Шифрування та розшифрування на машині «Енігма»»", "title_b"))
+    s.append(P("з дисципліни", "title_c"))
+    s.append(P("«Захист даних»", "title_c"))
     s.append(Spacer(1, 115))
-
-    left = ParagraphStyle("tl", parent=TITLE_C, alignment=TA_LEFT)
-    t = Table(
-        [[Paragraph("Викладач:", left), Paragraph("Виконав:", left)],
-         [Paragraph("", left), Paragraph("Студент групи РС-61мн", left)],
-         [Paragraph("Навроцький Денис Олександрович", left),
-          Paragraph("Гандзюк Дмитро Васильович", left)]],
-        colWidths=[CONTENT_W * 0.52, CONTENT_W * 0.48], hAlign="CENTER",
-    )
-    t.setStyle(TableStyle([
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 0),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-    ]))
-    s.append(t)
+    s.append({"k": "signatures", "rows": [
+        ("Викладач:", "Виконав:"),
+        ("", "Студент групи РС-61мн"),
+        ("Навроцький Денис Олександрович", "Гандзюк Дмитро Васильович"),
+    ]})
     s.append(Spacer(1, 150))
-    s.append(P("Київ – 2026 р.", TITLE_C))
+    s.append(P("Київ – 2026 р.", "title_c"))
     s.append(PageBreak())
     return s
 
@@ -280,7 +234,7 @@ def body():
         "властивості шифротексту, визначити фактичний розмір простору ключів "
         "і практично реалізувати атаки в усіх основних моделях зловмисника — "
         "від перебору ключа до відновлення відкритого тексту лише за "
-        "шифротекстом.", BODY_NI))
+        "шифротекстом.", "body_ni"))
 
     # ----------------------------------------------------------------- #
     s.append(H("Хід роботи"))
@@ -364,8 +318,10 @@ def body():
         "Розв’язок виконано мовою Python 3 (основна реалізація) і "
         "продубльовано мовою C# на платформі .NET 8 (незалежна реалізація для "
         "перехресної перевірки). Вихідний код самодостатнього розв’язку для "
-        "платформи наведено в додатку А, ядро шифру — у додатку Б, модуль "
-        "криптоаналізу — у додатку В, реалізацію мовою C# — у додатку Г."))
+        "платформи наведено в додатку А. Решта вихідних текстів — ядро шифру, "
+        "модуль криптоаналізу, статистичні метрики, набір автоматичних тестів "
+        "і реалізація мовою C# — доступні в репозиторії роботи, посилання на "
+        "який наведено в списку використаних джерел."))
 
     s.append(P(
         "Головне архітектурне рішення випливає зі спостереження 1: каскад "
@@ -875,29 +831,349 @@ def sources():
         "https://github.com/RE22GDV/LR2-Enigma",
     ]
     for i, r in enumerate(refs, 1):
-        s.append(P("%d. %s" % (i, r), BODY_NI))
-        s.append(Spacer(1, 4))
+        s.append(P("%d. %s" % (i, r), "ref"))
     return s
 
 
 def appendices():
-    s = []
-    specs = [
-        ("А", "Розв’язок задачі, надісланий на платформу CodinGame",
-         ROOT / "solution" / "codingame_solution.py"),
-        ("Б", "Ядро шифру (модуль src/enigma/core.py)",
-         ROOT / "src" / "enigma" / "core.py"),
-        ("В", "Криптоаналітичні атаки (модуль src/enigma/attacks.py)",
-         ROOT / "src" / "enigma" / "attacks.py"),
-        ("Г", "Незалежна реалізація мовою C# (csharp/Enigma/Program.cs)",
-         ROOT / "csharp" / "Enigma" / "Program.cs"),
-    ]
-    for letter, caption, path in specs:
-        s.append(PageBreak())
-        s.append(H("Додаток %s" % letter))
-        s.append(P(caption, ParagraphStyle("apc", parent=CAPTION, spaceAfter=10)))
-        s.extend(listing(path))
+    s = [PageBreak(), H("Додаток А")]
+    s.append(P("Розв’язок задачі, надісланий на платформу CodinGame", "app_caption"))
+    s.append(P(
+        "Нижче наведено повний текст файла solution/codingame_solution.py — саме "
+        "цей код надіслано на платформу CodinGame й оцінено валідаторами на "
+        "100 %. Решта вихідних текстів роботи (ядро шифру, модуль "
+        "криптоаналізу, статистичні метрики, набір із 86 автоматичних тестів, "
+        "скрипти експериментів і незалежна реалізація мовою C#) не наводиться "
+        "тут, щоб не переобтяжувати звіт, і доступна в репозиторії: "
+        "https://github.com/RE22GDV/LR2-Enigma", "body_ni"))
+    s.append(Spacer(1, 8))
+    s.extend(listing(ROOT / "solution" / "codingame_solution.py"))
     return s
+
+
+# --------------------------------------------------------------------------- #
+#  Рендерер 1: PDF (reportlab)
+# --------------------------------------------------------------------------- #
+
+def _pdf_styles():
+    body = ParagraphStyle("body", fontName="TNR", fontSize=14, leading=21,
+                          alignment=TA_JUSTIFY, firstLineIndent=1.25 * cm, spaceAfter=0)
+    return {
+        "body": body,
+        "body_ni": ParagraphStyle("body_ni", parent=body, firstLineIndent=0),
+        "title_c": ParagraphStyle("title_c", fontName="TNR", fontSize=14, leading=21,
+                                  alignment=TA_CENTER, firstLineIndent=0),
+        "title_b": ParagraphStyle("title_b", fontName="TNR-Bold", fontSize=14, leading=21,
+                                  alignment=TA_CENTER, firstLineIndent=0),
+        "app_caption": ParagraphStyle("app_caption", fontName="TNR", fontSize=14, leading=21,
+                                      alignment=TA_CENTER, firstLineIndent=0, spaceAfter=10),
+        "ref": ParagraphStyle("ref", fontName="TNR", fontSize=14, leading=21,
+                              alignment=TA_LEFT, firstLineIndent=0, spaceAfter=8),
+        "h1": ParagraphStyle("h1", fontName="TNR-Bold", fontSize=16, leading=24,
+                             alignment=TA_CENTER, spaceBefore=14, spaceAfter=12,
+                             firstLineIndent=0),
+        "h2": ParagraphStyle("h2", fontName="TNR-Bold", fontSize=14, leading=21,
+                             alignment=TA_CENTER, spaceBefore=12, spaceAfter=8,
+                             firstLineIndent=0),
+        "caption": ParagraphStyle("caption", fontName="TNR", fontSize=14, leading=21,
+                                  alignment=TA_CENTER, spaceBefore=6, spaceAfter=12,
+                                  firstLineIndent=0),
+        "tcap": ParagraphStyle("tcap", fontName="TNR", fontSize=14, leading=21,
+                               alignment=TA_JUSTIFY, firstLineIndent=0, spaceAfter=4),
+        "cell": ParagraphStyle("cell", fontName="TNR", fontSize=12, leading=15,
+                               alignment=TA_LEFT, firstLineIndent=0),
+        "cell_c": ParagraphStyle("cell_c", fontName="TNR", fontSize=12, leading=15,
+                                 alignment=TA_CENTER, firstLineIndent=0),
+        "cell_h": ParagraphStyle("cell_h", fontName="TNR-Bold", fontSize=12, leading=15,
+                                 alignment=TA_CENTER, firstLineIndent=0),
+    }
+
+
+def _pdf_page_number(canvas, doc):
+    canvas.saveState()
+    canvas.setFont("TNR", 14)
+    canvas.drawCentredString(PAGE_W / 2.0, 12 * mm, str(canvas.getPageNumber()))
+    canvas.restoreState()
+
+
+def render_pdf(blocks, out_path: Path) -> None:
+    st = _pdf_styles()
+    story = []
+
+    for b in blocks:
+        kind = b["k"]
+        if kind == "h":
+            story.append(Paragraph(nbsp(b["text"]), st["h1" if b["level"] == 1 else "h2"]))
+        elif kind == "p":
+            story.append(Paragraph(nbsp(b["text"]), st[b["style"]]))
+        elif kind == "gap":
+            story.append(RLSpacer(1, b["h"]))
+        elif kind == "break":
+            story.append(RLPageBreak())
+        elif kind == "fig":
+            with PILImage.open(b["path"]) as im:
+                iw, ih = im.size
+            w = CONTENT_W * b["max_w_frac"]
+            h = w * ih / iw
+            if h > b["max_h_mm"] * mm:
+                h = b["max_h_mm"] * mm
+                w = h * iw / ih
+            img = RLImage(b["path"], width=w, height=h)
+            img.hAlign = "CENTER"
+            story.append(KeepTogether(
+                [img, Paragraph(nbsp("Рисунок %s – %s" % (b["num"], b["cap"])),
+                                st["caption"])]))
+        elif kind == "table":
+            data = []
+            for r_i, row in enumerate(b["rows"]):
+                out_row = []
+                for c_i, cell in enumerate(row):
+                    if r_i == 0 and b["header"]:
+                        style = st["cell_h"]
+                    elif b["align"] and b["align"][c_i] == "c":
+                        style = st["cell_c"]
+                    else:
+                        style = st["cell"]
+                    out_row.append(Paragraph(nbsp(cell), style))
+                data.append(out_row)
+            t = RLTable(data, colWidths=b["widths"], hAlign="CENTER",
+                        repeatRows=1 if b["header"] else 0)
+            t.setStyle(TableStyle([
+                ("GRID", (0, 0), (-1, -1), 0.6, colors.black),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("TOPPADDING", (0, 0), (-1, -1), 3),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+                ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+                ("BACKGROUND", (0, 0), (-1, 0), colors.Color(0.93, 0.93, 0.93)),
+            ]))
+            story.append(Paragraph(nbsp("Таблиця %s – %s" % (b["num"], b["cap"])),
+                                   st["tcap"]))
+            story.append(t)
+            story.append(RLSpacer(1, 12))
+        elif kind == "code":
+            style = ParagraphStyle("code_%d" % b["size"], fontName="Cour",
+                                   fontSize=b["size"], leading=b["size"] * 1.25,
+                                   alignment=TA_LEFT, firstLineIndent=0, spaceAfter=0)
+            story.append(RLSpacer(1, 4))
+            chunk = []
+            for ln in b["lines"]:
+                chunk.append(html.escape(ln) if ln.strip() else "&nbsp;")
+                if len(chunk) >= 40:      # шматками, щоб працювали розриви сторінок
+                    story.append(XPreformatted("\n".join(chunk), style))
+                    chunk = []
+            if chunk:
+                story.append(XPreformatted("\n".join(chunk), style))
+            story.append(RLSpacer(1, 10))
+        elif kind == "signatures":
+            left = st["title_c"].clone("sig")
+            left.alignment = TA_LEFT
+            t = RLTable([[Paragraph(a, left), Paragraph(c, left)] for a, c in b["rows"]],
+                        colWidths=[CONTENT_W * 0.52, CONTENT_W * 0.48], hAlign="CENTER")
+            t.setStyle(TableStyle([
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ]))
+            story.append(t)
+        else:
+            raise ValueError("невідомий блок: %r" % kind)
+
+    doc = BaseDocTemplate(
+        str(out_path), pagesize=A4,
+        leftMargin=ML, rightMargin=MR, topMargin=MT, bottomMargin=MB,
+        title="Лабораторна робота №2 — Шифрування та розшифрування на машині «Енігма»",
+        author="Гандзюк Дмитро Васильович", subject="Захист даних",
+    )
+    frame = Frame(ML, MB, CONTENT_W, PAGE_H - MT - MB, id="main",
+                  leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0)
+    doc.addPageTemplates([PageTemplate(id="all", frames=[frame], onPage=_pdf_page_number)])
+    doc.build(story)
+
+
+# --------------------------------------------------------------------------- #
+#  Рендерер 2: DOCX (python-docx)
+# --------------------------------------------------------------------------- #
+
+def render_docx(blocks, out_path: Path) -> None:
+    import docx
+    from docx.enum.table import WD_TABLE_ALIGNMENT
+    from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+    from docx.shared import Cm, Pt, RGBColor
+
+    ALIGN = {"l": WD_ALIGN_PARAGRAPH.LEFT, "c": WD_ALIGN_PARAGRAPH.CENTER}
+    EMU_PER_PT = 12700
+
+    doc = docx.Document()
+
+    sec = doc.sections[0]
+    sec.page_width, sec.page_height = int(PAGE_W * EMU_PER_PT), int(PAGE_H * EMU_PER_PT)
+    sec.left_margin, sec.right_margin = int(ML * EMU_PER_PT), int(MR * EMU_PER_PT)
+    sec.top_margin, sec.bottom_margin = int(MT * EMU_PER_PT), int(MB * EMU_PER_PT)
+
+    normal = doc.styles["Normal"]
+    normal.font.name = "Times New Roman"
+    normal.font.size = Pt(14)
+    normal.font.color.rgb = RGBColor(0, 0, 0)
+    normal.element.rPr.rFonts.set(qn("w:eastAsia"), "Times New Roman")
+    normal.element.rPr.rFonts.set(qn("w:cs"), "Times New Roman")
+    pf = normal.paragraph_format
+    pf.line_spacing = 1.5
+    pf.space_before = Pt(0)
+    pf.space_after = Pt(0)
+
+    # нумерація сторінок — унизу по центру
+    footer = sec.footer.paragraphs[0]
+    footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    fr = footer.add_run()
+    fr.font.name = "Times New Roman"
+    fr.font.size = Pt(14)
+    for tag, attrs, value in (("w:fldChar", {"w:fldCharType": "begin"}, None),
+                              ("w:instrText", {"xml:space": "preserve"}, "PAGE"),
+                              ("w:fldChar", {"w:fldCharType": "end"}, None)):
+        el = OxmlElement(tag)
+        for k, v in attrs.items():
+            el.set(qn(k), v)
+        if value:
+            el.text = value
+        fr._r.append(el)
+
+    def para(text, *, align=WD_ALIGN_PARAGRAPH.JUSTIFY, indent=True, bold=False,
+             size=14, font="Times New Roman", spacing=1.5, space_after=0,
+             space_before=0, keep_with_next=False):
+        p = doc.add_paragraph()
+        p.alignment = align
+        fmt = p.paragraph_format
+        fmt.first_line_indent = Cm(1.25) if indent else Cm(0)
+        fmt.line_spacing = spacing
+        fmt.space_after = Pt(space_after)
+        fmt.space_before = Pt(space_before)
+        fmt.keep_with_next = keep_with_next
+        for chunk, b_, i_ in runs(text):
+            r = p.add_run(chunk)
+            r.font.name = font
+            r.font.size = Pt(size)
+            r.bold = bold or b_
+            r.italic = i_
+            r._element.rPr.rFonts.set(qn("w:eastAsia"), font)
+            r._element.rPr.rFonts.set(qn("w:cs"), font)
+        return p
+
+    for b in blocks:
+        kind = b["k"]
+        if kind == "h":
+            para(b["text"], align=WD_ALIGN_PARAGRAPH.CENTER, indent=False, bold=True,
+                 size=16 if b["level"] == 1 else 14,
+                 space_before=12, space_after=8, keep_with_next=True)
+        elif kind == "p":
+            if b["style"] == "body":
+                para(b["text"])
+            elif b["style"] == "body_ni":
+                para(b["text"], indent=False)
+            elif b["style"] == "ref":
+                para(b["text"], align=WD_ALIGN_PARAGRAPH.LEFT, indent=False,
+                     space_after=8)
+            elif b["style"] in ("title_c", "title_b"):
+                para(b["text"], align=WD_ALIGN_PARAGRAPH.CENTER, indent=False,
+                     bold=(b["style"] == "title_b"))
+            else:   # app_caption
+                para(b["text"], align=WD_ALIGN_PARAGRAPH.CENTER, indent=False,
+                     space_after=10)
+        elif kind == "gap":
+            # Порожній абзац у Word займає цілий рядок, тому для невеликих
+            # проміжків робимо його однопунктовим.
+            p = doc.add_paragraph()
+            fmt = p.paragraph_format
+            fmt.line_spacing = 1
+            fmt.space_before = Pt(0)
+            fmt.space_after = Pt(b["h"] * 0.75)
+            r = p.add_run("")
+            r.font.size = Pt(1)
+        elif kind == "break":
+            doc.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
+        elif kind == "fig":
+            with PILImage.open(b["path"]) as im:
+                iw, ih = im.size
+            w = CONTENT_W * b["max_w_frac"]
+            h = w * ih / iw
+            if h > b["max_h_mm"] * mm:
+                h = b["max_h_mm"] * mm
+                w = h * iw / ih
+            p = doc.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            p.paragraph_format.first_line_indent = Cm(0)
+            p.paragraph_format.line_spacing = 1
+            p.paragraph_format.keep_with_next = True
+            p.add_run().add_picture(b["path"], width=int(w * EMU_PER_PT))
+            para("Рисунок %s – %s" % (b["num"], b["cap"]),
+                 align=WD_ALIGN_PARAGRAPH.CENTER, indent=False, space_after=12)
+        elif kind == "table":
+            para("Таблиця %s – %s" % (b["num"], b["cap"]), indent=False,
+                 space_after=2, keep_with_next=True)
+            rows, cols = len(b["rows"]), len(b["rows"][0])
+            t = doc.add_table(rows=rows, cols=cols)
+            t.style = "Table Grid"
+            t.alignment = WD_TABLE_ALIGNMENT.CENTER
+            for r_i, row in enumerate(b["rows"]):
+                for c_i, cell in enumerate(row):
+                    tc = t.cell(r_i, c_i)
+                    tp = tc.paragraphs[0]
+                    header = (r_i == 0 and b["header"])
+                    tp.alignment = (WD_ALIGN_PARAGRAPH.CENTER if header
+                                    else ALIGN.get((b["align"] or ["l"] * cols)[c_i],
+                                                   WD_ALIGN_PARAGRAPH.LEFT))
+                    tp.paragraph_format.line_spacing = 1
+                    tp.paragraph_format.space_after = Pt(0)
+                    for chunk, b_, i_ in runs(cell):
+                        r = tp.add_run(chunk)
+                        r.font.name = "Times New Roman"
+                        r.font.size = Pt(12)
+                        r.bold = header or b_
+                        r.italic = i_
+                    if b["widths"]:
+                        tc.width = int(b["widths"][c_i] * EMU_PER_PT)
+            doc.add_paragraph().paragraph_format.space_after = Pt(6)
+        elif kind == "code":
+            for ln in b["lines"]:
+                p = doc.add_paragraph()
+                p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                fmt = p.paragraph_format
+                fmt.first_line_indent = Cm(0)
+                fmt.line_spacing = 1
+                fmt.space_after = Pt(0)
+                fmt.space_before = Pt(0)
+                r = p.add_run(ln if ln.strip() else "")
+                r.font.name = "Courier New"
+                r.font.size = Pt(b["size"])
+                r._element.rPr.rFonts.set(qn("w:eastAsia"), "Courier New")
+                r._element.rPr.rFonts.set(qn("w:cs"), "Courier New")
+                # зберегти провідні пробіли
+                for t_el in r._element.findall(qn("w:t")):
+                    t_el.set(qn("xml:space"), "preserve")
+            doc.add_paragraph().paragraph_format.space_after = Pt(6)
+        elif kind == "signatures":
+            t = doc.add_table(rows=len(b["rows"]), cols=2)
+            t.alignment = WD_TABLE_ALIGNMENT.CENTER
+            for r_i, (a, c) in enumerate(b["rows"]):
+                for c_i, val in enumerate((a, c)):
+                    tp = t.cell(r_i, c_i).paragraphs[0]
+                    tp.paragraph_format.line_spacing = 1.5
+                    tp.paragraph_format.space_after = Pt(0)
+                    r = tp.add_run(val)
+                    r.font.name = "Times New Roman"
+                    r.font.size = Pt(14)
+                    t.cell(r_i, c_i).width = int(CONTENT_W * (0.52 if c_i == 0 else 0.48)
+                                                 * EMU_PER_PT)
+        else:
+            raise ValueError("невідомий блок: %r" % kind)
+
+    doc.core_properties.title = ("Лабораторна робота №2 — Шифрування та "
+                                 "розшифрування на машині «Енігма»")
+    doc.core_properties.author = "Гандзюк Дмитро Васильович"
+    doc.core_properties.subject = "Захист даних"
+    doc.save(str(out_path))
 
 
 # --------------------------------------------------------------------------- #
@@ -906,22 +1182,20 @@ def main() -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
 
-    doc = BaseDocTemplate(
-        str(OUT), pagesize=A4,
-        leftMargin=ML, rightMargin=MR, topMargin=MT, bottomMargin=MB,
-        title="Лабораторна робота №2 — Шифрування та розшифрування на машині «Енігма»",
-        author="Гандзюк Дмитро Васильович",
-        subject="Захист даних",
-    )
-    frame = Frame(ML, MB, CONTENT_W, PAGE_H - MT - MB, id="main",
-                  leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0)
-    doc.addPageTemplates([PageTemplate(id="all", frames=[frame], onPage=on_page)])
+    ap = argparse.ArgumentParser(description="Складання звіту з лабораторної роботи.")
+    ap.add_argument("--format", choices=["pdf", "docx", "both"], default="both",
+                    help="який формат згенерувати (типово — обидва)")
+    args = ap.parse_args()
 
-    story = title_page() + body() + conclusions() + sources() + appendices()
-    doc.build(story)
+    blocks = title_page() + body() + conclusions() + sources() + appendices()
+    print("блоків у звіті: %d" % len(blocks))
 
-    size_kb = OUT.stat().st_size / 1024
-    print("Звіт створено: %s (%.0f КБ)" % (OUT, size_kb))
+    if args.format in ("pdf", "both"):
+        render_pdf(blocks, OUT_PDF)
+        print("PDF  -> %s (%.0f КБ)" % (OUT_PDF, OUT_PDF.stat().st_size / 1024))
+    if args.format in ("docx", "both"):
+        render_docx(blocks, OUT_DOCX)
+        print("DOCX -> %s (%.0f КБ)" % (OUT_DOCX, OUT_DOCX.stat().st_size / 1024))
     return 0
 
 
