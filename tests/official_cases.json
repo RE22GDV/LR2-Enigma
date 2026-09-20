@@ -1,0 +1,54 @@
+{
+  "source": "https://www.codingame.com/training/easy/encryptiondecryption-of-enigma-machine",
+  "note": "Офіційні валідаційні тести CodinGame (6 шт.). Усі використовують один і той самий набір роторів.",
+  "cases": [
+    {
+      "label": "Encode 3",
+      "mode": "ENCODE",
+      "shift": 4,
+      "rotors": ["BDFHJLCPRTXVZNYEIWGAKMUSQO", "AJDKSIRUXBLHWTMCQGZNPYFVOE", "EKMFLGDQVZNTOWYHXUSPAIBRCJ"],
+      "message": "AAA",
+      "expected": "KQF"
+    },
+    {
+      "label": "Encode 23",
+      "mode": "ENCODE",
+      "shift": 7,
+      "rotors": ["BDFHJLCPRTXVZNYEIWGAKMUSQO", "AJDKSIRUXBLHWTMCQGZNPYFVOE", "EKMFLGDQVZNTOWYHXUSPAIBRCJ"],
+      "message": "WEATHERREPORTWINDYTODAY",
+      "expected": "ALWAURKQEQQWLRAWZHUYKVN"
+    },
+    {
+      "label": "Decode 21",
+      "mode": "DECODE",
+      "shift": 9,
+      "rotors": ["BDFHJLCPRTXVZNYEIWGAKMUSQO", "AJDKSIRUXBLHWTMCQGZNPYFVOE", "EKMFLGDQVZNTOWYHXUSPAIBRCJ"],
+      "message": "PQSACVVTOISXFXCIAMQEM",
+      "expected": "EVERYONEISWELCOMEHERE"
+    },
+    {
+      "label": "Encode 21",
+      "mode": "ENCODE",
+      "shift": 9,
+      "rotors": ["BDFHJLCPRTXVZNYEIWGAKMUSQO", "AJDKSIRUXBLHWTMCQGZNPYFVOE", "EKMFLGDQVZNTOWYHXUSPAIBRCJ"],
+      "message": "EVERYONEISWELCOMEHERE",
+      "expected": "PQSACVVTOISXFXCIAMQEM"
+    },
+    {
+      "label": "Encode 42",
+      "mode": "ENCODE",
+      "shift": 9,
+      "rotors": ["BDFHJLCPRTXVZNYEIWGAKMUSQO", "AJDKSIRUXBLHWTMCQGZNPYFVOE", "EKMFLGDQVZNTOWYHXUSPAIBRCJ"],
+      "message": "EVERYONEISWELCOMEHEREEVERYONEISWELCOMEHERE",
+      "expected": "PQSACVVTOISXFXCIAMQEMDZIXFJJSTQIENEFQXVZYV"
+    },
+    {
+      "label": "Decode 49",
+      "mode": "DECODE",
+      "shift": 5,
+      "rotors": ["BDFHJLCPRTXVZNYEIWGAKMUSQO", "AJDKSIRUXBLHWTMCQGZNPYFVOE", "EKMFLGDQVZNTOWYHXUSPAIBRCJ"],
+      "message": "XPCXAUPHYQALKJMGKRWPGYHFTKRFFFNOUTZCABUAEHQLGXREZ",
+      "expected": "THEQUICKBROWNFOXJUMPSOVERALAZYSPHINXOFBLACKQUARTZ"
+    }
+  ]
+}

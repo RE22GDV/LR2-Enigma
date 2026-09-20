@@ -1,0 +1,254 @@
+{
+  "meta": {
+    "plaintext_letters": 2035,
+    "language_model": "english_quadgrams.txt.gz (english quadgram counts, corpus=5623458 letters, min_count=3)",
+    "quick": false,
+    "total_seconds": 62.7186236
+  },
+  "frequency": {
+    "figure": "docs/figures/fig1_frequency.png",
+    "plaintext_ioc": 0.07072156629678754,
+    "ciphertext_ioc": 0.038629780222700576,
+    "plaintext_chi2": 56.804690051532,
+    "ciphertext_chi2": 13159.060946482417,
+    "plaintext_entropy": 4.10500156917608,
+    "ciphertext_entropy": 4.688600017586165,
+    "max_ct_freq_deviation_pp": 1.1661311661311653
+  },
+  "period": {
+    "figure": "docs/figures/fig2_ioc_period.png",
+    "best_period": 52,
+    "best_ioc": 0.0735933769334579,
+    "ioc_at_26": 0.07120062670208727,
+    "ioc_at_1": 0.038629780222700576,
+    "multiples_of_26_are_top": true
+  },
+  "bruteforce": {
+    "figure": "docs/figures/fig3_bruteforce.png",
+    "true_shift": 11,
+    "recovered_shift": 11,
+    "margin": 725.8283546583382,
+    "elapsed_ms": 2.939100000048711,
+    "correct": true
+  },
+  "success_vs_length": {
+    "figure": "docs/figures/fig4_success_vs_length.png",
+    "lengths": [
+      10,
+      20,
+      30,
+      40,
+      60,
+      80,
+      120,
+      160,
+      240
+    ],
+    "trials_per_point": 12,
+    "bruteforce_success_percent": [
+      100.0,
+      100.0,
+      100.0,
+      100.0,
+      100.0,
+      100.0,
+      100.0,
+      100.0,
+      100.0
+    ],
+    "ciphertext_only_success_percent": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      16.666666666666668,
+      75.0,
+      100.0,
+      100.0
+    ],
+    "ciphertext_only_mean_time_s": [
+      0.03023954999999508,
+      0.05626230833339226,
+      0.08251518333334691,
+      0.22830691666662992,
+      0.38489704999994956,
+      0.49753523333331867,
+      0.7648035916666913,
+      1.1908266000000178,
+      1.4899656583333467
+    ]
+  },
+  "crib": {
+    "figure": "docs/figures/fig5_crib_coverage.png",
+    "lengths": [
+      5,
+      10,
+      15,
+      20,
+      25,
+      30,
+      35,
+      40,
+      45,
+      50,
+      55,
+      60,
+      65,
+      70,
+      75,
+      80,
+      85,
+      90,
+      95,
+      100,
+      105,
+      110,
+      115,
+      120,
+      125,
+      130
+    ],
+    "empirical_coverage": [
+      4.635,
+      8.44,
+      11.53,
+      14.14,
+      16.285,
+      17.895,
+      19.605,
+      20.65,
+      21.605,
+      22.35,
+      22.895,
+      23.49,
+      23.875,
+      24.205,
+      24.53,
+      24.82,
+      24.955,
+      25.18,
+      25.3,
+      25.43,
+      25.56,
+      25.645,
+      25.67,
+      25.665,
+      25.755,
+      25.79
+    ],
+    "theoretical_coverage": [
+      4.629895224256851,
+      8.435331610529225,
+      11.563122929454842,
+      14.133939398766389,
+      16.24696314139692,
+      17.983714632691058,
+      19.41119776109043,
+      20.58448483876352,
+      21.548841291913494,
+      22.341472001335763,
+      22.99295666705982,
+      23.528429573456478,
+      23.96854927015911,
+      24.3302955790977,
+      24.627624676184475,
+      24.872007520708376,
+      25.072872405049527,
+      25.237968698285602,
+      25.37366581692182,
+      25.485198957038072,
+      25.576871068201605,
+      25.65221886130077,
+      25.71414925488347,
+      25.765051524101366,
+      25.806889478967115,
+      25.84127722816265
+    ],
+    "trials_per_point": 200,
+    "length_for_full_key": 105,
+    "mean_abs_error": 0.06079764898735656
+  },
+  "keyspace": {
+    "figure": "docs/figures/fig6_keyspace.png",
+    "bits_per_rotor": 88.38195332701626,
+    "nominal_bits": 269.84629969918984,
+    "effective_bits": 88.38195332701626,
+    "reduction_bits": 181.46434637217357,
+    "equivalent_keys_bits": 181.46434637217357,
+    "kerckhoffs_bits": 4.700439718141092,
+    "collision_found": true,
+    "collision_example": {
+      "key_a": {
+        "rotors": [
+          "TQCKBAMOEDVLWUYZHRINGJSXFP",
+          "ICAHVWQPJSMZTFYKEDOXULBNGR",
+          "ZJBGEVWLTMOCFPRYUDNSKQIAHX"
+        ],
+        "shift": 5
+      },
+      "key_b": {
+        "rotors": [
+          "TSHQLCXJKWDYGMVUNRPIOAEZFB"
+        ],
+        "shift": 0
+      }
+    }
+  },
+  "avalanche": {
+    "figure": "docs/figures/fig7_avalanche.png",
+    "lengths": [
+      25,
+      50,
+      100,
+      200,
+      400
+    ],
+    "avalanche_percent": [
+      4.0,
+      2.0,
+      1.0,
+      0.5,
+      0.25
+    ],
+    "changed_chars_always_one": true
+  },
+  "attacks": {
+    "message_length": 180,
+    "true_shift": 11,
+    "rows": [
+      {
+        "attack": "Перебір зсуву",
+        "model": "відомі ротори",
+        "cost": "26 варіантів",
+        "elapsed_s": 0.007210299999997005,
+        "key_recovered": true,
+        "plaintext_recovered": true
+      },
+      {
+        "attack": "Відомий відкритий текст",
+        "model": "пара (текст, шифротекст)",
+        "cost": "180 символів",
+        "elapsed_s": 9.469999986322364e-05,
+        "key_recovered": true,
+        "plaintext_recovered": true
+      },
+      {
+        "attack": "Підібраний відкритий текст",
+        "model": "доступ до оракула",
+        "cost": "1 запит на 26 символів",
+        "elapsed_s": 5.4500000032930984e-05,
+        "key_recovered": true,
+        "plaintext_recovered": true
+      },
+      {
+        "attack": "Тільки шифротекст",
+        "model": "нічого, крім шифротексту",
+        "cost": "78481 оцінок",
+        "elapsed_s": 3.0428038000000015,
+        "key_recovered": true,
+        "plaintext_recovered": true
+      }
+    ]
+  }
+}
