@@ -101,6 +101,11 @@ FIG = ROOT / "docs" / "figures"
 RES = ROOT / "docs" / "results"
 
 
+def _n(value: float, digits: int = 2) -> str:
+    """Число з комою як десятковим роздільником (для підписів на рисунках)."""
+    return ("%.*f" % (digits, value)).replace(".", ",")
+
+
 def _finish(ax, note: str | None = None) -> None:
     for side in ("top", "right"):
         ax.spines[side].set_visible(False)
@@ -112,11 +117,23 @@ def _finish(ax, note: str | None = None) -> None:
 
 
 def save(fig, name: str) -> str:
+    """
+    Зберігає рисунок двічі:
+      docs/figures/<name>      — із заголовком, для README на GitHub;
+      docs/figures/pdf/<name>  — без заголовка, для PDF-звіту, де роль
+                                 заголовка виконує підпис «Рисунок N.M – ...».
+    """
     FIG.mkdir(parents=True, exist_ok=True)
     path = FIG / name
     fig.savefig(path, dpi=200, bbox_inches="tight")
+
+    (FIG / "pdf").mkdir(parents=True, exist_ok=True)
+    for ax in fig.axes:
+        ax.set_title("")
+    fig.savefig(FIG / "pdf" / name, dpi=200, bbox_inches="tight")
+
     plt.close(fig)
-    print("    рисунок -> %s" % path.relative_to(ROOT))
+    print("    рисунок -> %s (+ pdf/)" % path.relative_to(ROOT))
     return str(path.relative_to(ROOT)).replace("\\", "/")
 
 
@@ -160,9 +177,9 @@ def exp_frequency(plaintext: str) -> dict:
     ax.set_ylabel("частота, %")
     ax.set_title("Рис. 1. Інкрементний зсув вирівнює частоти літер")
     ax.legend(loc="upper right", ncols=3)
-    _finish(ax, "IoC: відкритий %.4f -> шифротекст %.4f   |   хі-квадрат: %.0f -> %.0f"
-            % (index_of_coincidence(plaintext), index_of_coincidence(ciphertext),
-               chi_squared(plaintext), chi_squared(ciphertext)))
+    _finish(ax, "IoC: відкритий %s -> шифротекст %s   |   хі-квадрат: %s -> %s"
+            % (_n(index_of_coincidence(plaintext), 4), _n(index_of_coincidence(ciphertext), 4),
+               _n(chi_squared(plaintext), 0), _n(chi_squared(ciphertext), 0)))
     path = save(fig, "fig1_frequency.png")
 
     return {
@@ -195,12 +212,12 @@ def exp_period(plaintext: str) -> dict:
     ax.axhline(IOC_ENGLISH, color=INK_2, linewidth=1.2, linestyle=(0, (4, 3)), zorder=2)
     ax.axhline(IOC_RANDOM, color=INK_2, linewidth=1.2, linestyle=(0, (1, 3)), zorder=2)
     ax.set_xlim(-1, 70)
-    ax.text(53.5, IOC_ENGLISH, "  англійська 0.0667", va="bottom", fontsize=8, color=INK_2)
-    ax.text(53.5, IOC_RANDOM, "  випадкова 0.0385", va="bottom", fontsize=8, color=INK_2)
+    ax.text(53.5, IOC_ENGLISH, "  англійська 0,0667", va="bottom", fontsize=8, color=INK_2)
+    ax.text(53.5, IOC_RANDOM, "  випадкова 0,0385", va="bottom", fontsize=8, color=INK_2)
 
     peak = dict(profile)[26]
     ax.scatter([26], [peak], s=110, color=S2, zorder=5)
-    ax.annotate("період 26\nIoC = %.4f" % peak,
+    ax.annotate("період 26\nIoC = %s" % _n(peak, 4),
                 xy=(26, peak), xytext=(33, peak - 0.009),
                 fontsize=9, color=INK, va="center",
                 arrowprops=dict(arrowstyle="-", color=S2, linewidth=1.4))
@@ -253,8 +270,8 @@ def exp_bruteforce(plaintext: str) -> dict:
     handles = [plt.Rectangle((0, 0), 1, 1, color=S1),
                plt.Rectangle((0, 0), 1, 1, color=S2)]
     ax.legend(handles, ["хибні кандидати", "правильний зсув"], loc="lower right")
-    _finish(ax, "відрив від найкращого хибного кандидата: %.0f одиниць оцінки; час атаки %.1f мс"
-            % (result.notes["margin_over_runner_up"], result.elapsed_s * 1000))
+    _finish(ax, "відрив від найкращого хибного кандидата: %s одиниць оцінки; час атаки %s мс"
+            % (_n(result.notes["margin_over_runner_up"], 0), _n(result.elapsed_s * 1000, 1)))
     path = save(fig, "fig3_bruteforce.png")
 
     return {
@@ -380,8 +397,8 @@ def exp_crib(plaintext: str, quick: bool) -> dict:
     ax.set_ylim(0, 28.5)
     ax.set_title("Рис. 5. Відомий відкритий текст: ключ збирається як купони")
     ax.legend(loc="lower right")
-    _finish(ax, "середнє відхилення експерименту від теорії: %.3f елемента"
-            % (sum(abs(a - b) for a, b in zip(empirical, theoretical)) / len(lengths)))
+    _finish(ax, "середнє відхилення експерименту від теорії: %s елемента"
+            % _n(sum(abs(a - b) for a, b in zip(empirical, theoretical)) / len(lengths), 3))
     path = save(fig, "fig5_crib_coverage.png")
 
     return {
@@ -415,11 +432,11 @@ def exp_keyspace() -> dict:
     bars = ax.barh(labels[::-1], values[::-1], color=S1, height=0.52, zorder=3)
     for bar, v in zip(bars, values[::-1]):
         ax.text(v + 4, bar.get_y() + bar.get_height() / 2,
-                "2^%.1f" % v, va="center", fontsize=10, color=INK, fontweight="semibold")
+                "2^" + _n(v, 1), va="center", fontsize=10, color=INK, fontweight="semibold")
     ax.set_xlabel("ентропія ключа, біт")
     ax.set_xlim(0, ks["nominal_bits"] * 1.18)
     ax.set_title("Рис. 6. Заявлена складність ключа майже вся є фіктивною")
-    _finish(ax, "надлишок: 2^%.1f біт ключів, що дають тотожні шифри" % ks["reduction_bits"])
+    _finish(ax, "надлишок: 2^%s біт ключів, що дають тотожні шифри" % _n(ks["reduction_bits"], 1))
     path = save(fig, "fig6_keyspace.png")
 
     return {
@@ -451,7 +468,7 @@ def exp_avalanche() -> dict:
     ax.text(len(lengths) - 0.5, 52, "ідеал стійкого шифру — 50 %",
             ha="right", fontsize=9, color=S2)
     for i, r in enumerate(ratios):
-        ax.text(i, r + 1.5, "%.1f %%" % r, ha="center", fontsize=9, color=INK)
+        ax.text(i, r + 1.5, "%s %%" % _n(r, 2), ha="center", fontsize=9, color=INK)
 
     ax.set_xlabel("довжина повідомлення, символів")
     ax.set_ylabel("змінено символів шифротексту")

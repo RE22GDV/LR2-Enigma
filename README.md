@@ -148,8 +148,10 @@ LR2_Enigma/
 ├── experiments/run_experiments.py Усі обчислювальні експерименти та рисунки
 ├── tools/build_ngrams.py          Побудова мовної моделі з корпусу
 ├── data/                          Модель мови + текст для експериментів
+├── tools/build_report.py          Генератор PDF-звіту
 └── docs/
-    ├── figures/                   Сім рисунків
+    ├── ЛР_2_...РС-61мн.pdf        Звіт (36 стор., генерується скриптом)
+    ├── figures/                   Рисунки (+ pdf/ — версії без заголовків)
     └── results/                   experiments.json, summary.md
 ```
 
@@ -215,6 +217,10 @@ dotnet run --project csharp/Enigma -- selftest
 | Мова | Python 3 |
 | Видимі тести | 6 з 6 |
 | Відправлений код | [`solution/codingame_solution.py`](solution/codingame_solution.py), байт-у-байт |
+
+![Усі тести пройдено](docs/figures/proof_tests.png)
+
+![Оцінка валідаторів 100 %](docs/figures/proof_score.png)
 
 ### 5.2 Офіційні тести, зафіксовані в репозиторії
 
@@ -532,6 +538,10 @@ python experiments/run_experiments.py
 
 # 4. Перебудова мовної моделі з корпусу (потрібен інтернет; результат уже в data/)
 python tools/build_ngrams.py
+
+# 5. Складання PDF-звіту (потрібні reportlab і шрифти Times New Roman / Courier New)
+python tools/build_report.py
+#   -> docs/ЛР_2_Гандзюк_Дмитро_РС-61мн.pdf
 ```
 
 Усі генератори псевдовипадкових чисел ініціалізуються фіксованими зернами,
