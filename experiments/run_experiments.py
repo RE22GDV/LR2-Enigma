@@ -424,7 +424,7 @@ def exp_keyspace() -> dict:
     labels = [
         "Номінальний ключ\n3 ротори + зсув:  (26!)³·26",
         "Фактичний ключ\nодна підстановка:  26!",
-        "За Керкгоффсом\nротори опубліковані:  26",
+        "Фіксовані відомі ротори\nсекретний зсув:  26",
     ]
     values = [ks["nominal_bits"], ks["effective_bits"], ks["kerckhoffs_bits"]]
 
@@ -432,11 +432,12 @@ def exp_keyspace() -> dict:
     bars = ax.barh(labels[::-1], values[::-1], color=S1, height=0.52, zorder=3)
     for bar, v in zip(bars, values[::-1]):
         ax.text(v + 4, bar.get_y() + bar.get_height() / 2,
-                "2^" + _n(v, 1), va="center", fontsize=10, color=INK, fontweight="semibold")
+                _n(v, 1), va="center", fontsize=10, color=INK, fontweight="semibold")
     ax.set_xlabel("ентропія ключа, біт")
     ax.set_xlim(0, ks["nominal_bits"] * 1.18)
-    ax.set_title("Рис. 6. Заявлена складність ключа майже вся є фіктивною")
-    _finish(ax, "надлишок: 2^%s біт ключів, що дають тотожні шифри" % _n(ks["reduction_bits"], 1))
+    ax.set_title("Рис. 6. Номінальний простір конфігурацій і простір ефективних ключів")
+    _finish(ax, "кожному ефективному ключу відповідає (26!)²·26 ≈ 2^%s конфігурацій"
+            % _n(ks["reduction_bits"], 1))
     path = save(fig, "fig6_keyspace.png")
 
     return {
@@ -454,7 +455,7 @@ def exp_keyspace() -> dict:
 # --------------------------------------------------------------------------- #
 
 def exp_avalanche() -> dict:
-    print("[7] Лавинний ефект")
+    print("[7] Поширення зміни одного символу")
     machine = EnigmaMachine(CODINGAME_ROTORS, 7)
     lengths = [25, 50, 100, 200, 400]
     ratios = []
@@ -464,17 +465,14 @@ def exp_avalanche() -> dict:
 
     fig, ax = plt.subplots(figsize=(8.6, 4.0))
     ax.bar([str(l) for l in lengths], ratios, color=S1, width=0.55, zorder=3)
-    ax.axhline(50, color=S2, linewidth=2.0, zorder=4)
-    ax.text(len(lengths) - 0.5, 52, "ідеал стійкого шифру — 50 %",
-            ha="right", fontsize=9, color=S2)
     for i, r in enumerate(ratios):
         ax.text(i, r + 1.5, "%s %%" % _n(r, 2), ha="center", fontsize=9, color=INK)
 
     ax.set_xlabel("довжина повідомлення, символів")
-    ax.set_ylabel("змінено символів шифротексту")
-    ax.set_ylim(0, 62)
-    ax.set_title("Рис. 7. Дифузія відсутня: один символ впливає рівно на один")
-    _finish(ax, "зміна одного символу відкритого тексту, 120 випробувань на стовпчик")
+    ax.set_ylabel("частка зміненого шифротексту, %")
+    ax.set_ylim(0, max(ratios) * 1.35)
+    ax.set_title("Рис. 7. Поширення зміни одного символу відкритого тексту")
+    _finish(ax, "змінюється рівно одна позиція шифротексту; 120 випробувань на стовпчик")
     path = save(fig, "fig7_avalanche.png")
 
     return {
@@ -557,16 +555,16 @@ def write_summary(results: dict) -> None:
         % (f["plaintext_ioc"], f["ciphertext_ioc"]),
         "| Хі-квадрат до англійської | %.0f | %.0f | менше — ближче до мови |"
         % (f["plaintext_chi2"], f["ciphertext_chi2"]),
-        "| Ентропія, біт/символ | %.3f | %.3f | максимум 4.700 |"
+        "| Емпірична ентропія окремих символів, біт | %.3f | %.3f | максимум 4.700 |"
         % (f["plaintext_entropy"], f["ciphertext_entropy"]),
         "",
         "## Простір ключів",
         "",
-        "| Модель | Ентропія ключа |",
-        "|---|---:|",
-        "| Номінально, 3 ротори + зсув | 2^%.1f |" % k["nominal_bits"],
-        "| Фактично, одна підстановка | 2^%.1f |" % k["effective_bits"],
-        "| За Керкгоффсом (ротори відомі) | 2^%.1f |" % k["kerckhoffs_bits"],
+        "| Модель | Кількість варіантів | Ентропія, біт |",
+        "|---|---|---:|",
+        "| Номінально, 3 ротори + зсув | (26!)^3 * 26 | %.1f |" % k["nominal_bits"],
+        "| Фактично, одна підстановка D | 26! | %.1f |" % k["effective_bits"],
+        "| Фіксовані відомі ротори, секретний зсув | 26 | %.1f |" % k["kerckhoffs_bits"],
         "",
         "## Атаки",
         "",

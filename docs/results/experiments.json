@@ -3,7 +3,7 @@
     "plaintext_letters": 2035,
     "language_model": "english_quadgrams.txt.gz (english quadgram counts, corpus=5623458 letters, min_count=3)",
     "quick": false,
-    "total_seconds": 54.93993259999979
+    "total_seconds": 30.174137900000005
   },
   "frequency": {
     "figure": "docs/figures/fig1_frequency.png",
@@ -28,7 +28,7 @@
     "true_shift": 11,
     "recovered_shift": 11,
     "margin": 725.8283546583382,
-    "elapsed_ms": 2.819300000282965,
+    "elapsed_ms": 3.0901000000085332,
     "correct": true
   },
   "success_vs_length": {
@@ -68,15 +68,15 @@
       100.0
     ],
     "ciphertext_only_mean_time_s": [
-      0.031035549999993844,
-      0.05742518333333161,
-      0.11380548333340812,
-      0.23616092499999772,
-      0.3516249083332544,
-      0.491867374999894,
-      0.737506066666621,
-      1.2036256416666145,
-      1.055293049999894
+      0.031660749999976666,
+      0.0586251000000099,
+      0.08710750833332288,
+      0.11335291666656151,
+      0.17248810000000958,
+      0.22677170000000993,
+      0.347500425000059,
+      0.5237505833331776,
+      0.6688423333333731
     ]
   },
   "crib": {
@@ -221,7 +221,7 @@
         "attack": "Перебір зсуву",
         "model": "відомі ротори",
         "cost": "26 варіантів",
-        "elapsed_s": 0.0030723999998372165,
+        "elapsed_s": 0.0030822000003354333,
         "key_recovered": true,
         "plaintext_recovered": true
       },
@@ -229,7 +229,7 @@
         "attack": "Відомий відкритий текст",
         "model": "пара (текст, шифротекст)",
         "cost": "180 символів",
-        "elapsed_s": 3.49000001733657e-05,
+        "elapsed_s": 3.399999968678458e-05,
         "key_recovered": true,
         "plaintext_recovered": true
       },
@@ -237,7 +237,7 @@
         "attack": "Підібраний відкритий текст",
         "model": "доступ до оракула",
         "cost": "1 запит на 26 символів",
-        "elapsed_s": 1.9299999621580355e-05,
+        "elapsed_s": 1.990000009755022e-05,
         "key_recovered": true,
         "plaintext_recovered": true
       },
@@ -245,7 +245,7 @@
         "attack": "Тільки шифротекст",
         "model": "нічого, крім шифротексту",
         "cost": "78481 оцінок",
-        "elapsed_s": 1.319962900000064,
+        "elapsed_s": 1.3328428999998323,
         "key_recovered": true,
         "plaintext_recovered": true
       }

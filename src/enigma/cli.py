@@ -179,11 +179,11 @@ def cmd_keyspace(args: argparse.Namespace) -> int:
         print("  Ключ B: N=%d, ротори=%s" % (b["shift"], b["rotors"]))
         print("  Обидва дають однаковий шифротекст на 120 випадкових символах: так")
 
-    print("\nЛавинний ефект (дифузія):")
+    print("\nМіжсимвольна дифузія:")
     av = avalanche_test(EnigmaMachine(CODINGAME_ROTORS, 7), rng=args.seed)
     print("  Змінено символів шифротексту при зміні 1 символу: %.2f з %d"
           % (av["avg_changed_chars"], int(av["message_length"])))
-    print("  Частка: %.4f   (для стійкого шифру очікується ~0.5)"
+    print("  Частка: %.4f   (змінюється рівно одна позиція з L)"
           % av["avalanche_ratio"])
     return 0
 
